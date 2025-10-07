@@ -300,16 +300,45 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"share_file",
 			{
 				fileId: z.string().describe("ID of the file to share"),
-				email: z.string().describe("Email address to share with"),
+				email: z.string().optional().describe("Email address (required for 'user' or 'group' type)"),
+				domain: z.string().optional().describe("Domain name (required for 'domain' type)"),
 				role: z.enum(["reader", "writer", "commenter"]).describe("Permission role"),
 				type: z.enum(["user", "group", "domain", "anyone"]).default("user").describe("Permission type"),
 			},
-			async ({ fileId, email, role, type }) => {
-				const permission = {
+			async ({ fileId, email, domain, role, type }) => {
+				// Build permission object based on type
+				const permission: any = {
 					type,
 					role,
-					emailAddress: email,
 				};
+
+				// Add type-specific fields
+				if (type === "user" || type === "group") {
+					if (!email) {
+						return {
+							content: [
+								{
+									type: "text",
+									text: `Error: 'email' parameter is required for type '${type}'`,
+								},
+							],
+						};
+					}
+					permission.emailAddress = email;
+				} else if (type === "domain") {
+					if (!domain) {
+						return {
+							content: [
+								{
+									type: "text",
+									text: "Error: 'domain' parameter is required for type 'domain'",
+								},
+							],
+						};
+					}
+					permission.domain = domain;
+				}
+				// For type 'anyone', no additional fields needed
 
 				const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
 					method: "POST",
