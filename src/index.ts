@@ -319,78 +319,83 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 		);
 
 		// 10. Share file / Set permissions
-		this.server.tool(
-			"share_file",
-			{
+		// Schema with conditional validation using superRefine
+		const shareFileParams = z
+			.object({
 				fileId: z.string().describe("ID of the file to share"),
-				email: z.string().optional().describe("Email address (required for 'user' or 'group' type)"),
-				domain: z.string().optional().describe("Domain name (required for 'domain' type)"),
-				role: z.enum(["reader", "writer", "commenter"]).describe("Permission role"),
 				type: z.enum(["user", "group", "domain", "anyone"]).default("user").describe("Permission type"),
-			},
-			async ({ fileId, email, domain, role, type }) => {
-				// Build type-safe permission object using strict discriminated union
-				let permission: DrivePermission;
-
-				// Handle each type separately for strict type safety
-				if (type === "user") {
-					if (!email) {
-						return {
-							content: [{ type: "text", text: "Error: 'email' parameter is required for type 'user'" }],
-						};
+				role: z.enum(["reader", "writer", "commenter"]).describe("Permission role"),
+				email: z.string().email().optional().describe("Email address (required for 'user' or 'group' type)"),
+				domain: z.string().optional().describe("Domain name (required for 'domain' type)"),
+			})
+			.superRefine((data, ctx) => {
+				// Validate conditional requirements based on type
+				if (data.type === "user" || data.type === "group") {
+					if (!data.email) {
+						ctx.addIssue({
+							code: z.ZodIssueCode.custom,
+							path: ["email"],
+							message: `Email is required when type is '${data.type}'`,
+						});
 					}
-					permission = {
-						type: "user",
-						role,
-						emailAddress: email,
-					};
-				} else if (type === "group") {
-					if (!email) {
-						return {
-							content: [{ type: "text", text: "Error: 'email' parameter is required for type 'group'" }],
-						};
+				} else if (data.type === "domain") {
+					if (!data.domain) {
+						ctx.addIssue({
+							code: z.ZodIssueCode.custom,
+							path: ["domain"],
+							message: "Domain is required when type is 'domain'",
+						});
 					}
-					permission = {
-						type: "group",
-						role,
-						emailAddress: email,
-					};
-				} else if (type === "domain") {
-					if (!domain) {
-						return {
-							content: [{ type: "text", text: "Error: 'domain' parameter is required for type 'domain'" }],
-						};
-					}
-					permission = {
-						type: "domain",
-						role,
-						domain,
-					};
-				} else {
-					// type === "anyone"
-					permission = {
-						type: "anyone",
-						role,
-					};
 				}
+			});
 
-				const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${this.props.accessToken}`,
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify(permission),
-				});
+		this.server.tool("share_file", shareFileParams.shape, async ({ fileId, email, domain, role, type }) => {
+			// Build type-safe permission object using strict discriminated union
+			let permission: DrivePermission;
 
-				if (!response.ok) {
-					const error = await response.text();
-					return { content: [{ type: "text", text: `Error: ${response.status} - ${error}` }] };
-				}
+			// Handle each type separately for strict type safety
+			if (type === "user") {
+				permission = {
+					type: "user",
+					role,
+					emailAddress: email!,  // ! is safe because superRefine validates this
+				};
+			} else if (type === "group") {
+				permission = {
+					type: "group",
+					role,
+					emailAddress: email!,  // ! is safe because superRefine validates this
+				};
+			} else if (type === "domain") {
+				permission = {
+					type: "domain",
+					role,
+					domain: domain!,  // ! is safe because superRefine validates this
+				};
+			} else {
+				// type === "anyone"
+				permission = {
+					type: "anyone",
+					role,
+				};
+			}
 
-				return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
-			},
-		);
+			const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${this.props.accessToken}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(permission),
+			});
+
+			if (!response.ok) {
+				const error = await response.text();
+				return { content: [{ type: "text", text: `Error: ${response.status} - ${error}` }] };
+			}
+
+			return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
+		});
 	}
 }
 
