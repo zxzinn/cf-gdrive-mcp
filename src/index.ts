@@ -13,9 +13,15 @@ type Props = {
 };
 
 // Google Drive API Permission types
+// Using strict discriminated union for type safety
 type DrivePermission =
 	| {
-			type: "user" | "group";
+			type: "user";
+			role: "reader" | "writer" | "commenter";
+			emailAddress: string;
+	  }
+	| {
+			type: "group";
 			role: "reader" | "writer" | "commenter";
 			emailAddress: string;
 	  }
@@ -323,45 +329,47 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				type: z.enum(["user", "group", "domain", "anyone"]).default("user").describe("Permission type"),
 			},
 			async ({ fileId, email, domain, role, type }) => {
-				// Build type-safe permission object using discriminated union
+				// Build type-safe permission object using strict discriminated union
 				let permission: DrivePermission;
 
-				if (type === "user" || type === "group") {
+				// Handle each type separately for strict type safety
+				if (type === "user") {
 					if (!email) {
 						return {
-							content: [
-								{
-									type: "text",
-									text: `Error: 'email' parameter is required for type '${type}'`,
-								},
-							],
+							content: [{ type: "text", text: "Error: 'email' parameter is required for type 'user'" }],
 						};
 					}
 					permission = {
-						type,
+						type: "user",
+						role,
+						emailAddress: email,
+					};
+				} else if (type === "group") {
+					if (!email) {
+						return {
+							content: [{ type: "text", text: "Error: 'email' parameter is required for type 'group'" }],
+						};
+					}
+					permission = {
+						type: "group",
 						role,
 						emailAddress: email,
 					};
 				} else if (type === "domain") {
 					if (!domain) {
 						return {
-							content: [
-								{
-									type: "text",
-									text: "Error: 'domain' parameter is required for type 'domain'",
-								},
-							],
+							content: [{ type: "text", text: "Error: 'domain' parameter is required for type 'domain'" }],
 						};
 					}
 					permission = {
-						type,
+						type: "domain",
 						role,
 						domain,
 					};
 				} else {
 					// type === "anyone"
 					permission = {
-						type,
+						type: "anyone",
 						role,
 					};
 				}
