@@ -12,6 +12,23 @@ type Props = {
 	accessToken: string;
 };
 
+// Google Drive API Permission types
+type DrivePermission =
+	| {
+			type: "user" | "group";
+			role: "reader" | "writer" | "commenter";
+			emailAddress: string;
+	  }
+	| {
+			type: "domain";
+			role: "reader" | "writer" | "commenter";
+			domain: string;
+	  }
+	| {
+			type: "anyone";
+			role: "reader" | "writer" | "commenter";
+	  };
+
 export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 	server = new McpServer({
 		name: "Google Drive MCP",
@@ -306,13 +323,9 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				type: z.enum(["user", "group", "domain", "anyone"]).default("user").describe("Permission type"),
 			},
 			async ({ fileId, email, domain, role, type }) => {
-				// Build permission object based on type
-				const permission: any = {
-					type,
-					role,
-				};
+				// Build type-safe permission object using discriminated union
+				let permission: DrivePermission;
 
-				// Add type-specific fields
 				if (type === "user" || type === "group") {
 					if (!email) {
 						return {
@@ -324,7 +337,11 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 							],
 						};
 					}
-					permission.emailAddress = email;
+					permission = {
+						type,
+						role,
+						emailAddress: email,
+					};
 				} else if (type === "domain") {
 					if (!domain) {
 						return {
@@ -336,9 +353,18 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 							],
 						};
 					}
-					permission.domain = domain;
+					permission = {
+						type,
+						role,
+						domain,
+					};
+				} else {
+					// type === "anyone"
+					permission = {
+						type,
+						role,
+					};
 				}
-				// For type 'anyone', no additional fields needed
 
 				const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
 					method: "POST",
