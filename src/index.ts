@@ -320,8 +320,22 @@ export default {
 		// Protect MCP endpoints (/mcp, /sse, /register) with API Key
 		// Allow OAuth flow endpoints (/authorize, /token, /callback) to pass through
 		// because they are accessed from the browser or by OAuth provider
+		const path = url.pathname.replace(/\/+$/, "") || "/";
 		const protectedEndpoints = ["/mcp", "/sse", "/register"];
-		if (protectedEndpoints.includes(url.pathname)) {
+
+		if (protectedEndpoints.includes(path)) {
+			// Allow CORS preflight without API key
+			if (request.method === "OPTIONS") {
+				return new Response(null, {
+					status: 204,
+					headers: {
+						"Access-Control-Allow-Origin": "*",
+						"Access-Control-Allow-Headers": "X-API-Key, Content-Type",
+						"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+					},
+				});
+			}
+
 			const apiKey = request.headers.get("X-API-Key");
 
 			// API Key is required for all MCP connections
@@ -341,19 +355,18 @@ export default {
 				);
 			}
 
-			const allowedKeys = env.ALLOWED_API_KEYS.split(",").map((k: string) => k.trim());
+			// Use Set for O(1) lookup and filter empty keys
+			const allowedKeys = new Set(env.ALLOWED_API_KEYS.split(",").map((k) => k.trim()).filter(Boolean));
 
 			console.log("API Key validation:", {
-				pathname: url.pathname,
+				pathname: path,
 				hasApiKey: !!apiKey,
-				receivedApiKey: apiKey,
 				apiKeyLength: apiKey?.length,
-				allowedKeys: allowedKeys,
-				allowedKeysCount: allowedKeys.length,
-				matches: apiKey ? allowedKeys.includes(apiKey) : false,
+				allowedKeysCount: allowedKeys.size,
+				matches: apiKey ? allowedKeys.has(apiKey) : false,
 			});
 
-			if (!apiKey || !allowedKeys.includes(apiKey)) {
+			if (!apiKey || !allowedKeys.has(apiKey)) {
 				return new Response(
 					JSON.stringify({
 						error: "Unauthorized",

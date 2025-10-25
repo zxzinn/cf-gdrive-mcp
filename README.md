@@ -82,11 +82,11 @@ If you'd like to iterate and test your MCP server, you can do so in local develo
 - For the Authorization callback URL, specify `http://localhost:8788/callback`
 - Note your Client ID and generate a Client secret.
 - Create a `.dev.vars` file in your project root with:
-```
+```bash
 GOOGLE_CLIENT_ID=your_development_google_cloud_oauth_client_id
 GOOGLE_CLIENT_SECRET=your_development_google_cloud_oauth_client_secret
 COOKIE_ENCRYPTION_KEY=any_random_string_here
-ALLOWED_API_KEYS=dev-key-1,dev-key-2  # Optional: leave empty to disable API key check in dev
+ALLOWED_API_KEYS=dev-key-1,dev-key-2
 ```
 
 #### Develop & Test

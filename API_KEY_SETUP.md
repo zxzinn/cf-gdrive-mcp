@@ -115,7 +115,7 @@ When connecting, you'll need to manually add the header in your HTTP client or u
 
 ```bash
 curl -X POST https://your-worker.workers.dev/mcp \
-  -H "X-API-Key: your-api-key-here" \
+  -H "X-API-Key: $GDRIVE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}'
 ```
@@ -182,12 +182,6 @@ wrangler secret put ALLOWED_API_KEYS
 # Remove the key from the comma-separated list
 wrangler secret put ALLOWED_API_KEYS
 ```
-
-## Backward Compatibility
-
-If `ALLOWED_API_KEYS` is not set, the server will allow all connections (no API key required). This ensures backward compatibility with existing deployments.
-
-To enable API key protection, simply set the `ALLOWED_API_KEYS` secret.
 
 ## Cost Impact
 
