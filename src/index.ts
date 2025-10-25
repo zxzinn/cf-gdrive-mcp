@@ -317,9 +317,11 @@ export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 
-		// Protect all endpoints except callback (callback needs to be accessible from browser)
-		// Only /callback endpoint is excluded because it's accessed directly from user's browser after Google OAuth
-		if (url.pathname !== "/callback") {
+		// Protect MCP endpoints (/mcp, /sse, /register) with API Key
+		// Allow OAuth flow endpoints (/authorize, /token, /callback) to pass through
+		// because they are accessed from the browser or by OAuth provider
+		const protectedEndpoints = ["/mcp", "/sse", "/register"];
+		if (protectedEndpoints.includes(url.pathname)) {
 			const apiKey = request.headers.get("X-API-Key");
 
 			// API Key is required for all MCP connections
@@ -344,7 +346,9 @@ export default {
 			console.log("API Key validation:", {
 				pathname: url.pathname,
 				hasApiKey: !!apiKey,
+				receivedApiKey: apiKey,
 				apiKeyLength: apiKey?.length,
+				allowedKeys: allowedKeys,
 				allowedKeysCount: allowedKeys.length,
 				matches: apiKey ? allowedKeys.includes(apiKey) : false,
 			});
