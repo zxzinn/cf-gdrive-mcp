@@ -83,8 +83,15 @@ async function signData(key: CryptoKey, data: string): Promise<string> {
 async function verifySignature(key: CryptoKey, signatureHex: string, data: string): Promise<boolean> {
 	const enc = new TextEncoder();
 	try {
+		// Validate hex string format before conversion
+		const hexMatches = signatureHex.match(/.{1,2}/g);
+		if (!hexMatches) {
+			console.error("Invalid signature format: not a valid hex string");
+			return false;
+		}
+
 		// Convert hex signature back to ArrayBuffer
-		const signatureBytes = new Uint8Array(signatureHex.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)));
+		const signatureBytes = new Uint8Array(hexMatches.map((byte) => Number.parseInt(byte, 16)));
 		return await crypto.subtle.verify("HMAC", key, signatureBytes.buffer, enc.encode(data));
 	} catch (e) {
 		// Handle errors during hex parsing or verification
