@@ -1,11 +1,8 @@
 import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { type Context, Hono } from "hono";
 import { fetchUpstreamAuthToken, getUpstreamAuthorizeUrl, type Props } from "./utils";
-import {
-	clientIdAlreadyApproved,
-	parseRedirectApproval,
-	renderApprovalDialog,
-} from "./workers-oauth-utils";
+import { clientIdAlreadyApproved, parseRedirectApproval, renderApprovalDialog } from "./workers-oauth-utils";
+import "./env";
 
 const app = new Hono<{ Bindings: Env & { OAUTH_PROVIDER: OAuthHelpers } }>();
 
@@ -16,9 +13,7 @@ app.get("/authorize", async (c) => {
 		return c.text("Invalid request", 400);
 	}
 
-	if (
-		await clientIdAlreadyApproved(c.req.raw, oauthReqInfo.clientId, c.env.COOKIE_ENCRYPTION_KEY)
-	) {
+	if (await clientIdAlreadyApproved(c.req.raw, oauthReqInfo.clientId, c.env.COOKIE_ENCRYPTION_KEY)) {
 		return redirectToGoogle(c, oauthReqInfo);
 	}
 
@@ -41,11 +36,7 @@ app.post("/authorize", async (c) => {
 	return redirectToGoogle(c, state.oauthReqInfo, headers);
 });
 
-async function redirectToGoogle(
-	c: Context,
-	oauthReqInfo: AuthRequest,
-	headers: Record<string, string> = {},
-) {
+async function redirectToGoogle(c: Context, oauthReqInfo: AuthRequest, headers: Record<string, string> = {}) {
 	return new Response(null, {
 		headers: {
 			...headers,

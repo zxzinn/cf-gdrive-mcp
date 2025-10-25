@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
 import { GoogleHandler } from "./google-handler";
+import "./env";
 
 // Context from the auth process, encrypted & stored in the auth token
 // and provided to the MyMCP as this.props
@@ -23,7 +24,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 		this.server.tool(
 			"list_files",
 			{
-				folderId: z.string().optional().describe("Folder ID to list files from. If not provided, lists from root or all accessible files."),
+				folderId: z
+					.string()
+					.optional()
+					.describe("Folder ID to list files from. If not provided, lists from root or all accessible files."),
 				pageSize: z.number().default(100).describe("Number of files to return (max 1000)"),
 				query: z.string().optional().describe("Google Drive query string (e.g., \"mimeType='image/jpeg'\")"),
 			},
@@ -49,7 +53,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 				const data = await response.json();
 				return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-			},
+			}
 		);
 
 		// 2. Search files
@@ -64,7 +68,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&pageSize=${pageSize}&fields=files(id,name,mimeType,webViewLink,modifiedTime)`,
 					{
 						headers: { Authorization: `Bearer ${this.props.accessToken}` },
-					},
+					}
 				);
 
 				if (!response.ok) {
@@ -73,7 +77,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				}
 
 				return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
-			},
+			}
 		);
 
 		// 3. Get file content
@@ -81,7 +85,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"get_file_content",
 			{
 				fileId: z.string().describe("The ID of the file to retrieve"),
-				mimeType: z.string().optional().describe("Export MIME type for Google Docs/Sheets/Slides (e.g., 'text/plain', 'application/pdf')"),
+				mimeType: z
+					.string()
+					.optional()
+					.describe("Export MIME type for Google Docs/Sheets/Slides (e.g., 'text/plain', 'application/pdf')"),
 			},
 			async ({ fileId, mimeType }) => {
 				let url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
@@ -104,7 +111,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 				const content = await response.text();
 				return { content: [{ type: "text", text: content }] };
-			},
+			}
 		);
 
 		// 4. Get file metadata
@@ -124,7 +131,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				}
 
 				return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
-			},
+			}
 		);
 
 		// 5. Upload file
@@ -144,8 +151,8 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				};
 
 				const boundary = "-------314159265358979323846";
-				const delimiter = "\r\n--" + boundary + "\r\n";
-				const closeDelimiter = "\r\n--" + boundary + "--";
+				const delimiter = `\r\n--${boundary}\r\n`;
+				const closeDelimiter = `\r\n--${boundary}--`;
 
 				const multipartRequestBody =
 					delimiter +
@@ -173,7 +180,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				}
 
 				return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
-			},
+			}
 		);
 
 		// 6. Create folder
@@ -205,7 +212,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				}
 
 				return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
-			},
+			}
 		);
 
 		// 7. Move file
@@ -233,7 +240,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				}
 
 				return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
-			},
+			}
 		);
 
 		// 8. Rename file
@@ -259,7 +266,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				}
 
 				return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
-			},
+			}
 		);
 
 		// 9. Delete file
@@ -287,13 +294,12 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 						},
 					],
 				};
-			},
+			}
 		);
-
 	}
 }
 
-export default new OAuthProvider({
+const oauthProvider = new OAuthProvider({
 	// NOTE - during the summer 2025, the SSE protocol was deprecated and replaced by the Streamable-HTTP protocol
 	// https://developers.cloudflare.com/agents/model-context-protocol/transport/#mcp-server-with-authentication
 	apiHandlers: {
@@ -305,3 +311,79 @@ export default new OAuthProvider({
 	defaultHandler: GoogleHandler as any,
 	tokenEndpoint: "/token",
 });
+
+// Wrapper to add API Key authentication before OAuth flow
+export default {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const url = new URL(request.url);
+
+		// Protect MCP endpoints (/mcp, /sse, /register) with API Key
+		// Allow OAuth flow endpoints (/authorize, /token, /callback) to pass through
+		// because they are accessed from the browser or by OAuth provider
+		const path = url.pathname.replace(/\/+$/, "") || "/";
+		const protectedEndpoints = ["/mcp", "/sse", "/register"];
+
+		if (protectedEndpoints.includes(path)) {
+			// Allow CORS preflight without API key
+			if (request.method === "OPTIONS") {
+				return new Response(null, {
+					status: 204,
+					headers: {
+						"Access-Control-Allow-Origin": "*",
+						"Access-Control-Allow-Headers": "X-API-Key, Content-Type",
+						"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+					},
+				});
+			}
+
+			const apiKey = request.headers.get("X-API-Key");
+
+			// API Key is required for all MCP connections
+			if (!env.ALLOWED_API_KEYS) {
+				console.error("ALLOWED_API_KEYS not configured");
+				return new Response(
+					JSON.stringify({
+						error: "Server Configuration Error",
+						message: "ALLOWED_API_KEYS environment variable is not configured",
+					}),
+					{
+						status: 500,
+						headers: {
+							"Content-Type": "application/json",
+						},
+					}
+				);
+			}
+
+			// Use Set for O(1) lookup and filter empty keys
+			const allowedKeys = new Set(env.ALLOWED_API_KEYS.split(",").map((k) => k.trim()).filter(Boolean));
+
+			console.log("API Key validation:", {
+				pathname: path,
+				hasApiKey: !!apiKey,
+				apiKeyLength: apiKey?.length,
+				allowedKeysCount: allowedKeys.size,
+				matches: apiKey ? allowedKeys.has(apiKey) : false,
+			});
+
+			if (!apiKey || !allowedKeys.has(apiKey)) {
+				return new Response(
+					JSON.stringify({
+						error: "Unauthorized",
+						message: "Valid X-API-Key header is required to access this endpoint",
+					}),
+					{
+						status: 401,
+						headers: {
+							"Content-Type": "application/json",
+							"WWW-Authenticate": "X-API-Key",
+						},
+					}
+				);
+			}
+		}
+
+		// Pass through to OAuth Provider
+		return oauthProvider.fetch(request, env, ctx);
+	},
+};
