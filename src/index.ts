@@ -319,28 +319,40 @@ export default {
 
 		// Only protect MCP endpoints - allow OAuth endpoints to pass through
 		if (url.pathname === "/mcp" || url.pathname === "/sse") {
-			// Check for API Key in X-API-Key header
 			const apiKey = request.headers.get("X-API-Key");
 
-			// If ALLOWED_API_KEYS is not set, allow all (backward compatible)
-			if (env.ALLOWED_API_KEYS) {
-				const allowedKeys = env.ALLOWED_API_KEYS.split(",").map((k: string) => k.trim());
+			// API Key is required for all MCP connections
+			if (!env.ALLOWED_API_KEYS) {
+				return new Response(
+					JSON.stringify({
+						error: "Server Configuration Error",
+						message: "ALLOWED_API_KEYS environment variable is not configured",
+					}),
+					{
+						status: 500,
+						headers: {
+							"Content-Type": "application/json",
+						},
+					}
+				);
+			}
 
-				if (!apiKey || !allowedKeys.includes(apiKey)) {
-					return new Response(
-						JSON.stringify({
-							error: "Unauthorized",
-							message: "Valid X-API-Key header is required to access this endpoint",
-						}),
-						{
-							status: 401,
-							headers: {
-								"Content-Type": "application/json",
-								"WWW-Authenticate": "X-API-Key",
-							},
-						}
-					);
-				}
+			const allowedKeys = env.ALLOWED_API_KEYS.split(",").map((k: string) => k.trim());
+
+			if (!apiKey || !allowedKeys.includes(apiKey)) {
+				return new Response(
+					JSON.stringify({
+						error: "Unauthorized",
+						message: "Valid X-API-Key header is required to access this endpoint",
+					}),
+					{
+						status: 401,
+						headers: {
+							"Content-Type": "application/json",
+							"WWW-Authenticate": "X-API-Key",
+						},
+					}
+				);
 			}
 		}
 

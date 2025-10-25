@@ -17,8 +17,8 @@ declare global {
 		// Optional: restrict to specific Google Workspace domain
 		HOSTED_DOMAIN?: string;
 
-		// API Key authentication (comma-separated list)
-		ALLOWED_API_KEYS?: string;
+		// API Key authentication (comma-separated list) - REQUIRED
+		ALLOWED_API_KEYS: string;
 	}
 }
 

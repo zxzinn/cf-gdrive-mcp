@@ -55,11 +55,11 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 *
-	 * To set secrets:
+	 * To set secrets (ALL REQUIRED):
 	 * wrangler secret put GOOGLE_CLIENT_ID
 	 * wrangler secret put GOOGLE_CLIENT_SECRET
 	 * wrangler secret put COOKIE_ENCRYPTION_KEY
-	 * wrangler secret put ALLOWED_API_KEYS  # comma-separated list of API keys
+	 * wrangler secret put ALLOWED_API_KEYS  # REQUIRED: comma-separated list of API keys
 	 */
 	/**
 	 * Static Assets

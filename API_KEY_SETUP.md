@@ -1,6 +1,6 @@
 # API Key Authentication Setup
 
-This MCP server now requires an API Key to protect the MCP endpoints from unauthorized access.
+This MCP server **requires** an API Key to protect the MCP endpoints from unauthorized access. The server will not function without setting `ALLOWED_API_KEYS`.
 
 ## Overview
 
