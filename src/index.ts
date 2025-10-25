@@ -317,12 +317,14 @@ export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 
-		// Only protect MCP endpoints - allow OAuth endpoints to pass through
-		if (url.pathname === "/mcp" || url.pathname === "/sse") {
+		// Protect all endpoints except callback (callback needs to be accessible from browser)
+		// Only /callback endpoint is excluded because it's accessed directly from user's browser after Google OAuth
+		if (url.pathname !== "/callback") {
 			const apiKey = request.headers.get("X-API-Key");
 
 			// API Key is required for all MCP connections
 			if (!env.ALLOWED_API_KEYS) {
+				console.error("ALLOWED_API_KEYS not configured");
 				return new Response(
 					JSON.stringify({
 						error: "Server Configuration Error",
@@ -338,6 +340,14 @@ export default {
 			}
 
 			const allowedKeys = env.ALLOWED_API_KEYS.split(",").map((k: string) => k.trim());
+
+			console.log("API Key validation:", {
+				pathname: url.pathname,
+				hasApiKey: !!apiKey,
+				apiKeyLength: apiKey?.length,
+				allowedKeysCount: allowedKeys.length,
+				matches: apiKey ? allowedKeys.includes(apiKey) : false,
+			});
 
 			if (!apiKey || !allowedKeys.includes(apiKey)) {
 				return new Response(
